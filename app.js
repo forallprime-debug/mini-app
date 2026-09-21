@@ -1,0 +1,135 @@
+// Card theme is configured here; all player and Telegram colors derive from color.
+const cards = [
+  { color: '#5C5BE4', title: ['Детройт-техно', 'романтика'], name: ['Влад', 'Микеев'], role: ['Музыкальный', 'редактор Звук'] },
+  { color: '#BF4245', title: ['Индастриал', 'техно-терапия'], name: ['Тося', 'Чайкина'], role: ['Музыкальный', 'критик'] },
+  { color: '#247DA4', title: ['Сити-поп', 'прямо из Токио'], name: ['Наоки', 'Тачикава'], role: ['Музыкальный', 'журналист'] },
+];
+const $ = selector => document.querySelector(selector);
+const carousel = $('.carousel'), audio = $('#audio'), seek = $('#seek');
+const tg = window.Telegram?.WebApp;
+const inTelegram = tg && tg.platform !== 'unknown';
+let active = 0, tracks = [], queues = [], positions = [0,0,0], generation = 0, noticeTimer, scrollTimer, initializing = true;
+let favorites = new Set();
+try { favorites = new Set(JSON.parse(localStorage.getItem('zvuk-favorites') || '[]')); } catch {}
+const lines = words => words.join('<br>');
+// Three repeated sets retain the previous implementation's seamless native swipe loop.
+carousel.innerHTML = Array.from({length:3}, (_,set) => cards.map((card,i) => `<article class="card" style="--card-color:${card.color}" data-index="${i}" aria-label="${card.title.join(' ')}" aria-roledescription="слайд" ${set !== 1 ? 'aria-hidden="true"' : ''}><img class="card-background" src="assets/card-0${i+1}-background.png" alt="" draggable="false"><div class="card-top"><img class="logo" src="assets/logo.svg" alt="Звук" draggable="false"><span>[0${i+1}/03]</span></div><img class="avatar" src="assets/card-0${i+1}-avatar.png" alt="${card.name.join(' ')}" draggable="false"><div class="card-copy"><h2>${lines(card.title)}</h2><div class="byline"><p>${lines(card.name)}</p><p>${lines(card.role)}</p></div></div></article>`).join('')).join('');
+const slides = [...carousel.children];
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function center(index, behavior = 'instant') {
+  const el = slides[index];
+  carousel.scrollTo({left:el.offsetLeft - (carousel.clientWidth - el.offsetWidth)/2,behavior});
+}
+function nearest() {
+  const middle = carousel.getBoundingClientRect().left + carousel.clientWidth/2;
+  return slides.reduce((best,el,i)=>Math.abs(el.getBoundingClientRect().left+el.offsetWidth/2-middle)<Math.abs(slides[best].getBoundingClientRect().left+slides[best].offsetWidth/2-middle)?i:best,0);
+}
+function tint(hex, fraction) {
+  return '#'+hex.slice(1).match(/../g).map(v=>Math.round(255+(parseInt(v,16)-255)*fraction).toString(16).padStart(2,'0')).join('');
+}
+function theme() {
+  const color = cards[active].color, surface = tint(color,.08);
+  document.documentElement.style.setProperty('--accent',color);
+  document.documentElement.style.setProperty('--tint',color+'1a');
+  document.documentElement.style.setProperty('--surface',surface);
+  $('meta[name=theme-color]').content = surface;
+  if (inTelegram) {
+    tg.setBackgroundColor?.(surface);
+    if (tg.isVersionAtLeast?.('6.9')) tg.setHeaderColor?.(surface);
+    if (tg.isVersionAtLeast?.('7.10')) tg.setBottomBarColor?.(surface);
+  }
+}
+function notify(message) { clearTimeout(noticeTimer); $('#status').textContent=message; $('#status').hidden=false; noticeTimer=setTimeout(()=>$('#status').hidden=true,4500); }
+function currentTrack() { return queues[active]?.[positions[active]]; }
+function savedState() {
+  const saved = favorites.has(currentTrack()?.src);
+  $('#save').setAttribute('aria-pressed',String(saved));
+  $('#save').setAttribute('aria-label',saved?'Удалить трек из избранного':'Добавить трек в избранное');
+}
+function time(seconds) { return Number.isFinite(seconds)?`${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,'0')}`:'0:00'; }
+function progress() {
+  const duration = Number.isFinite(audio.duration)?audio.duration:0;
+  seek.disabled = !duration;
+  seek.value = duration?audio.currentTime/duration*100:0;
+  seek.style.setProperty('--progress',`${seek.value}%`);
+  seek.setAttribute('aria-valuetext',`${time(audio.currentTime)} из ${time(duration)}`);
+  $('#elapsed').textContent=time(audio.currentTime); $('#duration').textContent=time(duration);
+}
+function playbackState() {
+  const playing = !audio.paused && !audio.ended;
+  $('#play').setAttribute('aria-label',playing?'Пауза':'Воспроизвести');
+  $('#play .icon').className=`icon ${playing?'pause':'play'}`;
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState=playing?'playing':'paused';
+}
+async function play() {
+  const request = generation;
+  try { await audio.play(); } catch(error) {
+    if(request === generation && error.name !== 'AbortError') notify('Не удалось включить трек. Нажмите play ещё раз.');
+  }
+}
+function loadTrack(autoplay=false) {
+  const track = currentTrack(); if (!track) return;
+  generation++;
+  audio.pause(); audio.src=track.src; audio.load();
+  $('#song-title').textContent=track.title; $('#song-title').title=track.title;
+  $('#artist').textContent=track.artist; $('#artist').title=track.artist;
+  savedState(); progress(); playbackState();
+  if ('mediaSession' in navigator && 'MediaMetadata' in window) navigator.mediaSession.metadata=new MediaMetadata({title:track.title,artist:track.artist,album:cards[active].title.join(' '),artwork:[{src:new URL(`assets/card-0${active+1}-avatar.png`,location.href).href,type:'image/png'}]});
+  if($('#playlist').open) renderPlaylist();
+  if(autoplay) void play();
+}
+function selectCard(index) {
+  if (index===active) return;
+  const resume = !audio.paused;
+  active=index; theme(); loadTrack(resume);
+}
+carousel.addEventListener('scroll',()=>{
+  if(initializing) return;
+  selectCard(nearest()%3);
+  clearTimeout(scrollTimer);
+  scrollTimer=setTimeout(()=>{const physical=nearest(); if(physical<3||physical>5) center(3+physical%3);},160);
+},{passive:true});
+carousel.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key==='ArrowLeft') { e.preventDefault(); center(Math.max(0,Math.min(8,nearest()+(e.key==='ArrowRight'?1:-1))),reducedMotion?'instant':'smooth'); }
+});
+// Native touch scrolling; pointer drag additionally supports a desktop mouse.
+let drag;
+carousel.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse')return;drag={x:e.clientX,left:carousel.scrollLeft};carousel.setPointerCapture(e.pointerId);carousel.style.scrollSnapType='none';});
+carousel.addEventListener('pointermove',e=>{if(drag)carousel.scrollLeft=drag.left+drag.x-e.clientX;});
+function endDrag(){if(!drag)return;drag=null;carousel.style.scrollSnapType='';center(nearest(),reducedMotion?'instant':'smooth');}
+carousel.addEventListener('pointerup',endDrag);carousel.addEventListener('pointercancel',endDrag);
+function step(delta,autoplay=!audio.paused) { if(!queues.length)return; positions[active]=(positions[active]+delta+tracks.length)%tracks.length; loadTrack(autoplay); }
+$('#play').addEventListener('click',()=>{if(!currentTrack())return;audio.paused?void play():audio.pause();});
+$('#prev').addEventListener('click',()=>step(-1));$('#next').addEventListener('click',()=>step(1));
+audio.addEventListener('ended',()=>step(1,true));
+for(const event of ['play','pause','ended']) audio.addEventListener(event,playbackState);
+for(const event of ['loadedmetadata','durationchange','timeupdate','emptied']) audio.addEventListener(event,progress);
+audio.addEventListener('error',()=>{playbackState();notify('Трек недоступен. Попробуйте следующий.');});
+seek.addEventListener('input',()=>{if(Number.isFinite(audio.duration)) audio.currentTime=audio.duration*Number(seek.value)/100;progress();});
+$('#save').addEventListener('click',()=>{const track=currentTrack();if(!track)return;favorites.has(track.src)?favorites.delete(track.src):favorites.add(track.src);try{localStorage.setItem('zvuk-favorites',JSON.stringify([...favorites]));}catch{}savedState();});
+function renderPlaylist() {
+  const container=$('#tracks'); container.replaceChildren();
+  queues[active]?.forEach((track,i)=>{const button=document.createElement('button');button.className='track';button.setAttribute('aria-current',String(i===positions[active]));button.append(document.createTextNode(track.title));const artist=document.createElement('span');artist.textContent=track.artist;button.append(artist);button.onclick=()=>{positions[active]=i;loadTrack(true);$('#playlist').close();};container.append(button);});
+}
+$('#tracklist').onclick=()=>{renderPlaylist();$('#playlist').showModal();};$('#dismiss').onclick=()=>$('#playlist').close();
+$('#playlist').addEventListener('click',e=>{if(e.target===$('#playlist')){const r=e.target.getBoundingClientRect();if(e.clientY<r.top||e.clientX<r.left||e.clientX>r.right)e.target.close();}});
+function updateViewport() {
+  if(inTelegram){
+    if(tg.viewportStableHeight)document.documentElement.style.setProperty('--app-height',`${tg.viewportStableHeight}px`);
+    document.documentElement.style.setProperty('--safe-top',`${(tg.safeAreaInset?.top||0)+(tg.contentSafeAreaInset?.top||0)}px`);
+    document.documentElement.style.setProperty('--safe-bottom',`${Math.max(12,(tg.safeAreaInset?.bottom||0)+(tg.contentSafeAreaInset?.bottom||0))}px`);
+  }
+  center(3+active);
+}
+if(inTelegram){tg.ready();tg.expand();for(const event of ['viewportChanged','safeAreaChanged','contentSafeAreaChanged'])tg.onEvent(event,updateViewport);}
+window.addEventListener('resize',updateViewport);
+if('mediaSession' in navigator){for(const [action,handler] of Object.entries({play:()=>play(),pause:()=>audio.pause(),previoustrack:()=>step(-1),nexttrack:()=>step(1),seekto:details=>{if(Number.isFinite(details.seekTime))audio.currentTime=details.seekTime;}})){try{navigator.mediaSession.setActionHandler(action,handler);}catch{}}}
+function shuffle(items) { const result=[...items];for(let i=result.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[result[i],result[j]]=[result[j],result[i]];}return result; }
+updateViewport();theme();requestAnimationFrame(()=>{center(3);initializing=false;});
+try {
+  const response=await fetch('tracks.json'); if(!response.ok)throw new Error('Catalog unavailable');
+  tracks=await response.json(); if(!tracks.length)throw new Error('Empty catalog');
+  const shuffled=shuffle(tracks);
+  queues=cards.map((_,i)=>[...shuffled.slice(i),...shuffled.slice(0,i)]);
+  loadTrack();
+} catch { $('#song-title').textContent='Нет доступных треков';$('#artist').textContent='Не удалось загрузить Songs';notify('Не удалось загрузить музыку. Обновите страницу.'); }
