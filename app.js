@@ -8,6 +8,15 @@ const $ = selector => document.querySelector(selector);
 const carousel = $('.carousel'), audio = $('#audio'), seek = $('#seek');
 const tg = window.Telegram?.WebApp;
 const inTelegram = tg && tg.platform !== 'unknown';
+// Optional enhancement: unsupported clients must retain all button behavior.
+function haptic(kind = 'light') {
+  if (!inTelegram || !tg.isVersionAtLeast?.('6.1')) return;
+  try {
+    if (kind === 'selection') tg.HapticFeedback?.selectionChanged();
+    else tg.HapticFeedback?.impactOccurred(kind);
+  } catch { /* Haptics may be unavailable on this device. */ }
+}
+
 let active = 0, tracks = [], queues = [], positions = [0,0,0], generation = 0, noticeTimer, scrollTimer, initializing = true;
 let favorites = new Set();
 try { favorites = new Set(JSON.parse(localStorage.getItem('zvuk-favorites') || '[]')); } catch {}
@@ -99,19 +108,19 @@ carousel.addEventListener('pointermove',e=>{if(drag)carousel.scrollLeft=drag.lef
 function endDrag(){if(!drag)return;drag=null;carousel.style.scrollSnapType='';center(nearest(),reducedMotion?'instant':'smooth');}
 carousel.addEventListener('pointerup',endDrag);carousel.addEventListener('pointercancel',endDrag);
 function step(delta,autoplay=!audio.paused) { if(!queues.length)return; positions[active]=(positions[active]+delta+tracks.length)%tracks.length; loadTrack(autoplay); }
-$('#play').addEventListener('click',()=>{if(!currentTrack())return;audio.paused?void play():audio.pause();});
-$('#prev').addEventListener('click',()=>step(-1));$('#next').addEventListener('click',()=>step(1));
+$('#play').addEventListener('click',()=>{if(!currentTrack())return;haptic();audio.paused?void play():audio.pause();});
+$('#prev').addEventListener('click',()=>{if(!currentTrack())return;haptic();step(-1);});$('#next').addEventListener('click',()=>{if(!currentTrack())return;haptic();step(1);});
 audio.addEventListener('ended',()=>step(1,true));
 for(const event of ['play','pause','ended']) audio.addEventListener(event,playbackState);
 for(const event of ['loadedmetadata','durationchange','timeupdate','emptied']) audio.addEventListener(event,progress);
 audio.addEventListener('error',()=>{playbackState();notify('Трек недоступен. Попробуйте следующий.');});
 seek.addEventListener('input',()=>{if(Number.isFinite(audio.duration)) audio.currentTime=audio.duration*Number(seek.value)/100;progress();});
-$('#save').addEventListener('click',()=>{const track=currentTrack();if(!track)return;favorites.has(track.src)?favorites.delete(track.src):favorites.add(track.src);try{localStorage.setItem('zvuk-favorites',JSON.stringify([...favorites]));}catch{}savedState();});
+$('#save').addEventListener('click',()=>{const track=currentTrack();if(!track)return;haptic('selection');favorites.has(track.src)?favorites.delete(track.src):favorites.add(track.src);try{localStorage.setItem('zvuk-favorites',JSON.stringify([...favorites]));}catch{}savedState();});
 function renderPlaylist() {
   const container=$('#tracks'); container.replaceChildren();
-  queues[active]?.forEach((track,i)=>{const button=document.createElement('button');button.className='track';button.setAttribute('aria-current',String(i===positions[active]));button.append(document.createTextNode(track.title));const artist=document.createElement('span');artist.textContent=track.artist;button.append(artist);button.onclick=()=>{positions[active]=i;loadTrack(true);$('#playlist').close();};container.append(button);});
+  queues[active]?.forEach((track,i)=>{const button=document.createElement('button');button.className='track';button.setAttribute('aria-current',String(i===positions[active]));button.append(document.createTextNode(track.title));const artist=document.createElement('span');artist.textContent=track.artist;button.append(artist);button.onclick=()=>{haptic();positions[active]=i;loadTrack(true);$('#playlist').close();};container.append(button);});
 }
-$('#tracklist').onclick=()=>{renderPlaylist();$('#playlist').showModal();};$('#dismiss').onclick=()=>$('#playlist').close();
+$('#tracklist').onclick=()=>{haptic();renderPlaylist();$('#playlist').showModal();};$('#dismiss').onclick=()=>{haptic();$('#playlist').close();};
 $('#playlist').addEventListener('click',e=>{if(e.target===$('#playlist')){const r=e.target.getBoundingClientRect();if(e.clientY<r.top||e.clientX<r.left||e.clientX>r.right)e.target.close();}});
 function updateViewport() {
   if(inTelegram){
