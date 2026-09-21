@@ -9,11 +9,12 @@ const carousel = $('.carousel'), audio = $('#audio'), seek = $('#seek');
 const tg = window.Telegram?.WebApp;
 const inTelegram = tg && tg.platform !== 'unknown';
 // Optional enhancement: unsupported clients must retain all button behavior.
-function haptic(kind = 'light') {
-  if (!inTelegram || !tg.isVersionAtLeast?.('6.1')) return;
+function haptic(kind = 'medium') {
+  const webApp = window.Telegram?.WebApp;
+  if (!webApp?.isVersionAtLeast?.('6.1')) return;
   try {
-    if (kind === 'selection') tg.HapticFeedback?.selectionChanged();
-    else tg.HapticFeedback?.impactOccurred(kind);
+    if (kind === 'selection') webApp.HapticFeedback?.selectionChanged();
+    else webApp.HapticFeedback?.impactOccurred(kind);
   } catch { /* Haptics may be unavailable on this device. */ }
 }
 
