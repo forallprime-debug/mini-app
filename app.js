@@ -107,6 +107,31 @@ carousel.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse')return;dr
 carousel.addEventListener('pointermove',e=>{if(drag)carousel.scrollLeft=drag.left+drag.x-e.clientX;});
 function endDrag(){if(!drag)return;drag=null;carousel.style.scrollSnapType='';center(nearest(),reducedMotion?'instant':'smooth');}
 carousel.addEventListener('pointerup',endDrag);carousel.addEventListener('pointercancel',endDrag);
+// Tap beside the portrait to change cards; movement cancels the tap so swipes
+// and desktop dragging cannot accidentally trigger an additional transition.
+let cardTap;
+carousel.addEventListener('pointerdown',event=>{
+  if (!event.isPrimary || event.button !== 0) return;
+  cardTap={id:event.pointerId,x:event.clientX,y:event.clientY,left:carousel.scrollLeft,moved:false};
+});
+carousel.addEventListener('pointermove',event=>{
+  if(cardTap?.id===event.pointerId && Math.hypot(event.clientX-cardTap.x,event.clientY-cardTap.y)>8) cardTap.moved=true;
+});
+carousel.addEventListener('pointercancel',()=>{cardTap=null;});
+carousel.addEventListener('pointerup',event=>{
+  const tap=cardTap;cardTap=null;
+  if(!tap || tap.id!==event.pointerId || tap.moved || Math.hypot(event.clientX-tap.x,event.clientY-tap.y)>8 || Math.abs(carousel.scrollLeft-tap.left)>8) return;
+  const index=nearest(), card=slides[index];
+  const bounds=card.getBoundingClientRect(), avatar=card.querySelector('.avatar').getBoundingClientRect();
+  if(event.clientY<avatar.top || event.clientY>avatar.bottom || event.clientX<bounds.left || event.clientX>bounds.right) return;
+  const direction=event.clientX<avatar.left?-1:event.clientX>avatar.right?1:0;
+  if(!direction)return;
+  // Recenter the repeated set first to keep wraparound available at both ends.
+  center(3+index%3);
+  haptic();
+  center(3+index%3+direction,reducedMotion?'instant':'smooth');
+});
+
 function step(delta,autoplay=!audio.paused) { if(!queues.length)return; positions[active]=(positions[active]+delta+tracks.length)%tracks.length; loadTrack(autoplay); }
 $('#play').addEventListener('click',()=>{if(!currentTrack())return;haptic();audio.paused?void play():audio.pause();});
 $('#prev').addEventListener('click',()=>{if(!currentTrack())return;haptic();step(-1);});$('#next').addEventListener('click',()=>{if(!currentTrack())return;haptic();step(1);});
