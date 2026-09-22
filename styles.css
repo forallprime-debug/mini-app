@@ -70,3 +70,7 @@ button{touch-action:manipulation}
 #playlist .track-number,#playlist .track-duration{font-size:12px;line-height:22px;letter-spacing:-.24px;font-weight:500;opacity:.7;font-variant-numeric:tabular-nums;white-space:nowrap}
 #playlist .track-duration{margin-left:16px}
 #playlist .track[aria-current=true]{background:color-mix(in srgb,var(--accent) 21%,transparent)}
+
+/* Dialog autofocus must not outline the full-width drag handle. */
+#playlist .sheet-handle:focus{outline:none;box-shadow:none}
+#playlist .sheet-handle:focus-visible span{outline:2px solid currentColor;outline-offset:3px}
