@@ -252,12 +252,75 @@ $('#save').addEventListener('click',()=>{
   try{localStorage.setItem('zvuk-favorites',JSON.stringify([...favorites]));}catch{}
   savedState();
 });
+const sheet=$('#playlist');
+let sheetCloseTimer, sheetDrag, sheetSuppressClick=false;
+function closePlaylist() {
+  if(!sheet.open)return;
+  sheet.classList.remove('is-open');
+  sheet.style.removeProperty('--sheet-drag');
+  clearTimeout(sheetCloseTimer);
+  sheetCloseTimer=setTimeout(()=>sheet.close(),reducedMotion?0:260);
+}
 function renderPlaylist() {
   const container=$('#tracks'); container.replaceChildren();
-  queues[active]?.forEach((track,i)=>{const button=document.createElement('button');button.className='track';button.setAttribute('aria-current',String(i===positions[active]));button.append(document.createTextNode(track.title));const artist=document.createElement('span');artist.textContent=track.artist;button.append(artist);button.onclick=()=>{haptic();positions[active]=i;loadTrack(true);$('#playlist').close();};container.append(button);});
+  $('#playlist-title').textContent=cards[active].title.join(' ');
+  $('#playlist-count').textContent=`${String(active+1).padStart(2,'0')} / 03`;
+  queues[active]?.forEach((track,i)=>{
+    const button=document.createElement('button');button.className='track';
+    button.setAttribute('aria-current',String(i===positions[active]));
+    const copy=document.createElement('span');copy.className='track-copy';
+    const title=document.createElement('span');title.className='track-title';title.textContent=track.title;
+    const artist=document.createElement('span');artist.className='track-artist';artist.textContent=track.artist;
+    const duration=document.createElement('span');duration.className='track-duration';duration.textContent=Number.isFinite(track.duration)?time(track.duration):'—';
+    copy.append(title,artist);button.append(copy,duration);
+    button.onclick=()=>{if(sheetSuppressClick)return;haptic();positions[active]=i;loadTrack(true);closePlaylist();};container.append(button);
+  });
 }
-$('#tracklist').onclick=()=>{haptic();renderPlaylist();$('#playlist').showModal();};$('#dismiss').onclick=()=>{haptic();$('#playlist').close();};
-$('#playlist').addEventListener('click',e=>{if(e.target===$('#playlist')){const r=e.target.getBoundingClientRect();if(e.clientY<r.top||e.clientX<r.left||e.clientX>r.right)e.target.close();}});
+$('#tracklist').onclick=()=>{
+  haptic();sheetSuppressClick=false;clearTimeout(sheetCloseTimer);renderPlaylist();sheet.showModal();
+  sheet.style.removeProperty('--sheet-drag');void sheet.offsetHeight;sheet.classList.add('is-open');
+};
+$('.sheet-handle').onclick=()=>{if(!sheetSuppressClick){haptic();closePlaylist();}};
+sheet.addEventListener('cancel',event=>{event.preventDefault();closePlaylist();});
+sheet.addEventListener('click',event=>{
+  if(event.target!==sheet)return;
+  const r=sheet.getBoundingClientRect();
+  if(event.clientY<r.top||event.clientX<r.left||event.clientX>r.right)closePlaylist();
+});
+// The handle always drags; the list can be pulled down only at its top.
+sheet.addEventListener('touchstart',event=>{
+  sheetSuppressClick=false;
+  if(event.touches.length!==1)return;
+  const handle=event.target.closest('.sheet-handle,.dialog-heading');
+  if(!handle && $('#tracks').scrollTop>0)return;
+  const touch=event.touches[0];sheetDrag={x:touch.clientX,y:touch.clientY,dy:0};
+},{passive:true});
+sheet.addEventListener('touchmove',event=>{
+  if(!sheetDrag||event.touches.length!==1)return;
+  const touch=event.touches[0],dy=touch.clientY-sheetDrag.y,dx=touch.clientX-sheetDrag.x;
+  if(dy<=0 || Math.abs(dx)>dy){if(!sheetDrag.dy)sheetDrag=null;return;}
+  event.preventDefault();sheetDrag.dy=dy;sheetSuppressClick=dy>8;
+  sheet.classList.add('is-dragging');sheet.style.setProperty('--sheet-drag',`${dy}px`);
+},{passive:false});
+function endSheetDrag(event){
+  if(!sheetDrag)return;
+  const dismiss=event.type!=='touchcancel'&&sheetDrag.dy>70;
+  sheetDrag=null;sheet.classList.remove('is-dragging');
+  if(dismiss){haptic('light');closePlaylist();}else sheet.style.removeProperty('--sheet-drag');
+}
+sheet.addEventListener('touchend',endSheetDrag);
+sheet.addEventListener('touchcancel',endSheetDrag);
+sheet.addEventListener('pointerdown',event=>{
+  if(event.pointerType!=='mouse'||!event.target.closest('.sheet-handle'))return;
+  sheetSuppressClick=false;sheetDrag={y:event.clientY,dy:0};event.target.setPointerCapture(event.pointerId);
+});
+sheet.addEventListener('pointermove',event=>{
+  if(event.pointerType!=='mouse'||!sheetDrag)return;
+  sheetDrag.dy=Math.max(0,event.clientY-sheetDrag.y);sheetSuppressClick=sheetDrag.dy>8;
+  sheet.classList.add('is-dragging');sheet.style.setProperty('--sheet-drag',`${sheetDrag.dy}px`);
+});
+sheet.addEventListener('pointerup',event=>{if(event.pointerType==='mouse')endSheetDrag(event);});
+sheet.addEventListener('pointercancel',()=>endSheetDrag({type:'touchcancel'}));
 function updateViewport() {
   if(inTelegram){
     if(tg.viewportStableHeight)document.documentElement.style.setProperty('--app-height',`${tg.viewportStableHeight}px`);
@@ -271,7 +334,7 @@ window.addEventListener('resize',updateViewport);
 if('mediaSession' in navigator){for(const [action,handler] of Object.entries({play:()=>play(),pause:()=>audio.pause(),previoustrack:()=>step(-1),nexttrack:()=>step(1),seekto:details=>{if(Number.isFinite(details.seekTime))audio.currentTime=details.seekTime;}})){try{navigator.mediaSession.setActionHandler(action,handler);}catch{}}}
 updateViewport();theme();requestAnimationFrame(()=>{center(3);initializing=false;});
 try {
-  const response=await fetch('tracks.json?v=20260922-card-queues'); if(!response.ok)throw new Error('Catalog unavailable');
+  const response=await fetch('tracks.json?v=20260922-sheet'); if(!response.ok)throw new Error('Catalog unavailable');
   tracks=await response.json(); if(!tracks.length)throw new Error('Empty catalog');
   queues=cards.map((_,i)=>tracks.filter(track=>track.card===i+1));
   loadTrack();
