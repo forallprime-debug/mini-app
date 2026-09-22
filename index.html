@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#f2f2fd">
   <title>Звук — Микстейпы</title>
-  <link rel="stylesheet" href="styles.css?v=20260922-nozoom">
+  <link rel="stylesheet" href="styles.css?v=20260922-sides">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script type="module" src="assets/glow.js?v=4-warm-ember"></script>
-  <script src="app.js?v=20260922-nozoom" type="module"></script>
+  <script src="app.js?v=20260922-sides" type="module"></script>
 </head>
 <body>
   <main class="app" aria-label="Музыкальные микстейпы">
@@ -28,7 +28,7 @@
     <button id="like-toast-open" type="button">Открыть</button>
   </aside>
   <p id="status" role="status" hidden></p>
-  <dialog id="playlist" aria-labelledby="playlist-title"><button class="sheet-handle" aria-label="Закрыть список треков"><span></span></button><div class="dialog-heading"><h2 id="playlist-title">Треки подборки</h2><span id="playlist-count"></span></div><div id="tracks"></div></dialog>
+  <dialog id="playlist" aria-labelledby="playlist-title"><button class="sheet-handle" aria-label="Закрыть список треков"><span></span></button><h2 id="playlist-title" class="sr-only">Треки подборки</h2><div id="tracks"></div></dialog>
   <audio id="audio" preload="metadata"></audio>
 </body>
 </html>

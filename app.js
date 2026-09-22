@@ -49,6 +49,7 @@ function tint(hex, fraction) {
 function theme() {
   const color = cards[active].color, surface = tint(color,.08);
   document.documentElement.style.setProperty('--accent',color);
+  document.documentElement.style.setProperty('--toast-background',color+'cc');
   document.documentElement.style.setProperty('--tint',color+'1a');
   document.documentElement.style.setProperty('--surface',surface);
   $('meta[name=theme-color]').content = surface;
@@ -60,6 +61,7 @@ function theme() {
   }
 }
 function notify(message) { clearTimeout(noticeTimer); $('#status').textContent=message; $('#status').hidden=false; noticeTimer=setTimeout(()=>$('#status').hidden=true,4500); }
+function trackSide(index, count) { return index < Math.ceil(count/2) ? 'A' : 'B'; }
 function currentTrack() { return queues[active]?.[positions[active]]; }
 function savedState() {
   const saved = favorites.has(currentTrack()?.src);
@@ -98,7 +100,8 @@ function loadTrack(autoplay=false) {
   }
   generation++;
   audio.pause(); audio.src=track.src; audio.load();
-  $('#song-title').textContent=track.title; $('#song-title').title=track.title;
+  const playerTitle=`[${trackSide(positions[active],queues[active].length)}] ${track.title}`;
+  $('#song-title').textContent=playerTitle; $('#song-title').title=playerTitle;
   $('#artist').textContent=track.artist; $('#artist').title=track.artist;
   savedState(); progress(); playbackState();
   if ('mediaSession' in navigator && 'MediaMetadata' in window) navigator.mediaSession.metadata=new MediaMetadata({title:track.title,artist:track.artist,album:cards[active].title.join(' '),artwork:[{src:new URL(`assets/card-0${active+1}-avatar.png`,location.href).href,type:'image/png'}]});
@@ -273,16 +276,28 @@ function closePlaylist() {
 function renderPlaylist() {
   const container=$('#tracks'); container.replaceChildren();
   $('#playlist-title').textContent=cards[active].title.join(' ');
-  $('#playlist-count').textContent=`${String(active+1).padStart(2,'0')} / 03`;
-  queues[active]?.forEach((track,i)=>{
+  const queue=queues[active] || [], split=Math.ceil(queue.length/2);
+  let section;
+  queue.forEach((track,i)=>{
+    const side=trackSide(i,queue.length);
+    if(i===0 || i===split){
+      section=document.createElement('section');section.className='track-side';section.dataset.side=side;
+      section.setAttribute('aria-label',`Side ${side}`);
+      const heading=document.createElement('div');heading.className='side-heading';
+      heading.innerHTML=side==='A'?'<span>Tracklist</span><span>Date/Time</span><span>[Side A]</span>':'<span>[Side B]</span><span class="noise-label">Noise reduction <i aria-hidden="true"></i></span>';
+      section.append(heading);container.append(section);
+    }
     const button=document.createElement('button');button.className='track';
     button.setAttribute('aria-current',String(i===positions[active]));
     const copy=document.createElement('span');copy.className='track-copy';
     const title=document.createElement('span');title.className='track-title';title.textContent=track.title;
     const artist=document.createElement('span');artist.className='track-artist';artist.textContent=track.artist;
     const duration=document.createElement('span');duration.className='track-duration';duration.textContent=Number.isFinite(track.duration)?time(track.duration):'—';
-    copy.append(title,artist);button.append(copy,duration);
-    button.onclick=()=>{if(sheetSuppressClick)return;haptic();positions[active]=i;loadTrack(true);closePlaylist();};container.append(button);
+    const number=document.createElement('span');number.className='track-number';number.textContent=`[${String((side==='A'?i:i-split)+1).padStart(2,'0')}]`;
+    duration.textContent=Number.isFinite(track.duration)?`(${time(track.duration).padStart(5,'0')})`:'(—)';
+    button.dataset.side=side;
+    copy.append(title,artist);button.append(number,copy,duration);
+    button.onclick=()=>{if(sheetSuppressClick)return;haptic();positions[active]=i;loadTrack(true);closePlaylist();};section.append(button);
   });
 }
 $('#tracklist').onclick=()=>{

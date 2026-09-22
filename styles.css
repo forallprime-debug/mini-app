@@ -19,14 +19,14 @@
 @media(prefers-reduced-motion:reduce){#seek::-webkit-slider-thumb{transition:none}#seek::-moz-range-thumb{transition:none}}
 
 /* Figma save confirmation stays inside Telegram safe insets. */
-.like-toast{position:fixed;z-index:5;top:calc(var(--safe-top) + 22px);left:50%;width:calc(100% - 32px);max-width:468px;padding:14px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-radius:10px;background:rgba(92,91,228,.8);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);color:white;transform:translate(-50%,calc(-100% - var(--safe-top) - 30px));opacity:0;transition:transform 250ms cubic-bezier(.2,.8,.2,1),opacity 200ms;touch-action:pan-x;user-select:none;pointer-events:none}
+.like-toast{position:fixed;z-index:5;top:calc(var(--safe-top) + 22px);left:50%;width:calc(100% - 32px);max-width:468px;padding:14px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-radius:10px;background:var(--toast-background,#5c5be4cc);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);color:white;transform:translate(-50%,calc(-100% - var(--safe-top) - 30px));opacity:0;transition:transform 250ms cubic-bezier(.2,.8,.2,1),opacity 200ms;touch-action:pan-x;user-select:none;pointer-events:none}
 .like-toast[hidden]{display:none}
 .like-toast.is-visible{transform:translate(-50%,0);opacity:1;pointer-events:auto}
 .like-toast-message{display:flex;align-items:center;gap:10px;min-width:0}
 .like-toast-message p{font-size:15px;line-height:1.1;letter-spacing:-.3px;font-weight:500}
 .like-toast-icon{display:grid;place-items:center;flex:none;width:44px;height:44px;border-radius:32px;background:rgba(250,240,240,.15)}
 .like-toast-icon img{width:23.333px;height:23.333px}
-#like-toast-open{flex:none;padding:14px 18px;border-radius:100px;background:white;color:#5c5be4;font-size:15px;font-weight:500;line-height:16px;letter-spacing:-.3px}
+#like-toast-open{flex:none;padding:14px 18px;border-radius:100px;background:white;color:var(--accent);font-size:15px;font-weight:500;line-height:16px;letter-spacing:-.3px}
 #like-toast-open:focus-visible{outline-color:white}
 @media(max-width:350px){.like-toast{gap:6px;padding-inline:10px}.like-toast-message{gap:7px}.like-toast-message p{font-size:13px}#like-toast-open{padding-inline:12px}}
 
@@ -53,3 +53,20 @@
 /* Allow scrolling while excluding pinch and double-tap zoom. */
 html,body{touch-action:pan-x pan-y}
 button{touch-action:manipulation}
+
+/* Cassette sides, matching the tracklist design. */
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+#playlist{background:white;padding:0 0 max(16px,var(--safe-bottom))}
+#playlist .sheet-handle{min-height:28px}
+#tracks{padding:0 16px 8px 2px;scrollbar-color:var(--tint) transparent}
+.side-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:0 16px 0 38px;margin:2px 0 8px;font-size:14px;line-height:22px;font-weight:500;font-style:italic;text-transform:uppercase;letter-spacing:-.28px}
+.side-heading>span:nth-child(2){font-size:12px}
+.track-side+.track-side{margin-top:40px}
+.noise-label{display:flex;align-items:center;gap:8px}
+.noise-label i{display:block;width:16px;height:16px;border:1px solid currentColor}
+#playlist .track{display:grid;grid-template-columns:26px minmax(0,1fr) auto;justify-items:stretch;align-items:start;gap:8px;padding:8px 16px 8px 6px;border-radius:4px;min-height:57px}
+#playlist .track-title{font-size:19px;font-weight:600;line-height:1.2;letter-spacing:-.38px}
+#playlist .track-artist{font-size:12px;font-weight:400;line-height:18px;letter-spacing:-.24px;opacity:1;margin-top:0}
+#playlist .track-number,#playlist .track-duration{font-size:12px;line-height:22px;letter-spacing:-.24px;font-weight:500;opacity:.7;font-variant-numeric:tabular-nums;white-space:nowrap}
+#playlist .track-duration{margin-left:16px}
+#playlist .track[aria-current=true]{background:color-mix(in srgb,var(--accent) 21%,transparent)}
