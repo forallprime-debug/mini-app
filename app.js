@@ -1,6 +1,15 @@
+// Keep the Mini App at its designed scale, including Safari gesture events.
+for (const name of ['gesturestart', 'gesturechange', 'gestureend']) {
+  document.addEventListener(name, event => event.preventDefault(), {passive:false});
+}
+for (const name of ['touchstart', 'touchmove']) {
+  document.addEventListener(name, event => {
+    if (event.touches.length > 1) event.preventDefault();
+  }, {passive:false});
+}
 // Card theme is configured here; all player and Telegram colors derive from color.
 const cards = [
-  { color: '#5C5BE4', title: ['Детройт-техно', 'романтика'], name: ['Влад', 'Микеев'], role: ['Музыкальный', 'редактор Звук'] },
+  { color: '#5C5BE4', title: ['Эмбиент-техно', 'романтика'], name: ['Влад', 'Микеев'], role: ['Музыкальный', 'редактор Звук'] },
   { color: '#BF4245', title: ['Индастриал', 'техно-терапия'], name: ['Тося', 'Чайкина'], role: ['Музыкальный', 'критик'] },
   { color: '#247DA4', title: ['Сити-поп', 'прямо из Токио'], name: ['Наоки', 'Тачикава'], role: ['Музыкальный', 'журналист'] },
 ];
