@@ -77,8 +77,12 @@ function progress() {
   seek.setAttribute('aria-valuetext',`${time(audio.currentTime)} из ${time(duration)}`);
   $('#elapsed').textContent=time(audio.currentTime); $('#duration').textContent=time(duration);
 }
+// Remember playback separately for each card, including while paused.
+const startedTracks = new Set();
+const playbackKey = () => `${active}:${currentTrack()?.src || ''}`;
 function playbackState() {
-  const playing = !audio.paused && !audio.ended;
+  const playing = !audio.paused && !audio.ended && !audio.error;
+  $('#playlist').classList.toggle('has-started-track',!!currentTrack() && startedTracks.has(playbackKey()));
   $('#play').setAttribute('aria-label',playing?'Пауза':'Воспроизвести');
   $('#play .icon').className=`icon ${playing?'pause':'play'}`;
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState=playing?'playing':'paused';
@@ -157,6 +161,9 @@ function step(delta,autoplay=!audio.paused) { const count=queues[active]?.length
 $('#play').addEventListener('click',()=>{if(!currentTrack())return;haptic();audio.paused?void play():audio.pause();});
 $('#prev').addEventListener('click',()=>{if(!currentTrack())return;haptic();step(-1);});$('#next').addEventListener('click',()=>{if(!currentTrack())return;haptic();step(1);});
 audio.addEventListener('ended',()=>step(1,true));
+audio.addEventListener('playing',()=>{
+  if(currentTrack()){startedTracks.add(playbackKey());playbackState();}
+});
 for(const event of ['play','pause','ended']) audio.addEventListener(event,playbackState);
 for(const event of ['loadedmetadata','durationchange','timeupdate','emptied']) audio.addEventListener(event,progress);
 audio.addEventListener('error',()=>{playbackState();notify('Трек недоступен. Попробуйте следующий.');});
