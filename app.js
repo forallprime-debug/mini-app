@@ -43,6 +43,7 @@ function theme() {
   document.documentElement.style.setProperty('--tint',color+'1a');
   document.documentElement.style.setProperty('--surface',surface);
   $('meta[name=theme-color]').content = surface;
+  window.dispatchEvent(new Event('miniapp:theme'));
   if (inTelegram) {
     tg.setBackgroundColor?.(surface);
     if (tg.isVersionAtLeast?.('6.9')) tg.setHeaderColor?.(surface);
@@ -140,7 +141,36 @@ audio.addEventListener('ended',()=>step(1,true));
 for(const event of ['play','pause','ended']) audio.addEventListener(event,playbackState);
 for(const event of ['loadedmetadata','durationchange','timeupdate','emptied']) audio.addEventListener(event,progress);
 audio.addEventListener('error',()=>{playbackState();notify('Трек недоступен. Попробуйте следующий.');});
-seek.addEventListener('input',()=>{if(Number.isFinite(audio.duration)) audio.currentTime=audio.duration*Number(seek.value)/100;progress();});
+let seekGesture = null;
+seek.addEventListener('pointerdown',event=>{
+  if(seek.disabled || !event.isPrimary || event.button !== 0 || seekGesture)return;
+  seekGesture={id:event.pointerId,bucket:Math.floor(audio.currentTime/15)};
+  seek.classList.add('is-scrubbing');
+  haptic('light');
+});
+function finishSeek(event){
+  if(!seekGesture || (event && event.pointerId !== seekGesture.id))return;
+  seekGesture=null;
+  seek.classList.remove('is-scrubbing');
+  if(event?.type==='pointerup')haptic('light');
+}
+window.addEventListener('pointerup',finishSeek);
+window.addEventListener('pointercancel',finishSeek);
+window.addEventListener('blur',()=>finishSeek());
+audio.addEventListener('emptied',()=>finishSeek());
+document.addEventListener('visibilitychange',()=>{if(document.hidden)finishSeek();});
+seek.addEventListener('input',()=>{
+  if(!Number.isFinite(audio.duration) || audio.duration<=0)return;
+  const nextTime=audio.duration*Number(seek.value)/100;
+  const oldBucket=seekGesture?.bucket ?? Math.floor(audio.currentTime/15);
+  const newBucket=Math.floor(nextTime/15);
+  // Only user scrubbing produces ticks, never ordinary playback. A large jump
+  // emits one tick, avoiding a queued vibration burst when several marks pass.
+  if(newBucket!==oldBucket)haptic('selection');
+  if(seekGesture)seekGesture.bucket=newBucket;
+  audio.currentTime=nextTime;
+  progress();
+});
 $('#save').addEventListener('click',()=>{const track=currentTrack();if(!track)return;haptic('selection');favorites.has(track.src)?favorites.delete(track.src):favorites.add(track.src);try{localStorage.setItem('zvuk-favorites',JSON.stringify([...favorites]));}catch{}savedState();});
 function renderPlaylist() {
   const container=$('#tracks'); container.replaceChildren();

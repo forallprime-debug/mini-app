@@ -9,3 +9,11 @@
 .card>.card-shader{position:absolute;inset:0;z-index:0;pointer-events:none;border-radius:inherit;background:#625BFF}
 .card.has-glow>.card-background{visibility:hidden}
 .card.has-glow>.card-top,.card.has-glow>.avatar,.card.has-glow>.card-copy{z-index:1}
+
+/* Thumb feedback without native WebView shadows. */
+#seek{touch-action:pan-x;filter:none;box-shadow:none}
+#seek::-webkit-slider-thumb{box-shadow:none;filter:none;transition:transform 120ms ease;transform-origin:center}
+#seek::-moz-range-thumb{box-shadow:none;filter:none;transition:transform 120ms ease;transform-origin:center}
+#seek.is-scrubbing::-webkit-slider-thumb{transform:scale(1.12)}
+#seek.is-scrubbing::-moz-range-thumb{transform:scale(1.12)}
+@media(prefers-reduced-motion:reduce){#seek::-webkit-slider-thumb{transition:none}#seek::-moz-range-thumb{transition:none}}
