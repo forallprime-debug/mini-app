@@ -79,7 +79,14 @@ async function play() {
   }
 }
 function loadTrack(autoplay=false) {
-  const track = currentTrack(); if (!track) return;
+  const track = currentTrack();
+  if (!track) {
+    generation++; audio.pause(); audio.removeAttribute('src'); audio.load();
+    $('#song-title').textContent='В подборке пока нет треков'; $('#artist').textContent='';
+    savedState(); progress(); playbackState();
+    if($('#playlist').open)renderPlaylist();
+    return;
+  }
   generation++;
   audio.pause(); audio.src=track.src; audio.load();
   $('#song-title').textContent=track.title; $('#song-title').title=track.title;
@@ -134,7 +141,7 @@ carousel.addEventListener('pointerup',event=>{
   center(3+index%3+direction,reducedMotion?'instant':'smooth');
 });
 
-function step(delta,autoplay=!audio.paused) { if(!queues.length)return; positions[active]=(positions[active]+delta+tracks.length)%tracks.length; loadTrack(autoplay); }
+function step(delta,autoplay=!audio.paused) { const count=queues[active]?.length || 0;if(!count)return; positions[active]=(positions[active]+delta+count)%count; loadTrack(autoplay); }
 $('#play').addEventListener('click',()=>{if(!currentTrack())return;haptic();audio.paused?void play():audio.pause();});
 $('#prev').addEventListener('click',()=>{if(!currentTrack())return;haptic();step(-1);});$('#next').addEventListener('click',()=>{if(!currentTrack())return;haptic();step(1);});
 audio.addEventListener('ended',()=>step(1,true));
@@ -262,12 +269,10 @@ function updateViewport() {
 if(inTelegram){tg.ready();tg.expand();for(const event of ['viewportChanged','safeAreaChanged','contentSafeAreaChanged'])tg.onEvent(event,updateViewport);}
 window.addEventListener('resize',updateViewport);
 if('mediaSession' in navigator){for(const [action,handler] of Object.entries({play:()=>play(),pause:()=>audio.pause(),previoustrack:()=>step(-1),nexttrack:()=>step(1),seekto:details=>{if(Number.isFinite(details.seekTime))audio.currentTime=details.seekTime;}})){try{navigator.mediaSession.setActionHandler(action,handler);}catch{}}}
-function shuffle(items) { const result=[...items];for(let i=result.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[result[i],result[j]]=[result[j],result[i]];}return result; }
 updateViewport();theme();requestAnimationFrame(()=>{center(3);initializing=false;});
 try {
-  const response=await fetch('tracks.json'); if(!response.ok)throw new Error('Catalog unavailable');
+  const response=await fetch('tracks.json?v=20260922-card-queues'); if(!response.ok)throw new Error('Catalog unavailable');
   tracks=await response.json(); if(!tracks.length)throw new Error('Empty catalog');
-  const shuffled=shuffle(tracks);
-  queues=cards.map((_,i)=>[...shuffled.slice(i),...shuffled.slice(0,i)]);
+  queues=cards.map((_,i)=>tracks.filter(track=>track.card===i+1));
   loadTrack();
 } catch { $('#song-title').textContent='Нет доступных треков';$('#artist').textContent='Не удалось загрузить Songs';notify('Не удалось загрузить музыку. Обновите страницу.'); }
