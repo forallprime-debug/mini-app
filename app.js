@@ -171,7 +171,80 @@ seek.addEventListener('input',()=>{
   audio.currentTime=nextTime;
   progress();
 });
-$('#save').addEventListener('click',()=>{const track=currentTrack();if(!track)return;haptic('selection');favorites.has(track.src)?favorites.delete(track.src):favorites.add(track.src);try{localStorage.setItem('zvuk-favorites',JSON.stringify([...favorites]));}catch{}savedState();});
+// Telegram exposes individual impacts; two paired beats form the like rhythm.
+let heartbeatTimers = [];
+function stopHeartbeat() {
+  heartbeatTimers.forEach(clearTimeout);
+  heartbeatTimers = [];
+}
+function heartbeat() {
+  stopHeartbeat();
+  haptic('medium');
+  for (const [delay, kind] of [[120,'heavy'],[460,'medium'],[580,'heavy']]) {
+    heartbeatTimers.push(setTimeout(()=>{if(!document.hidden)haptic(kind);},delay));
+  }
+}
+const likeToast = $('#like-toast');
+let toastTimer, toastExitTimer, toastGesture, suppressToastClick = false;
+function dismissLikeToast() {
+  clearTimeout(toastTimer);
+  clearTimeout(toastExitTimer);
+  likeToast.classList.remove('is-visible');
+  likeToast.inert = true;
+  if(likeToast.contains(document.activeElement))$('#save').focus({preventScroll:true});
+  toastExitTimer = setTimeout(()=>{likeToast.hidden=true;},reducedMotion?0:260);
+}
+function showLikeToast() {
+  clearTimeout(toastTimer);
+  clearTimeout(toastExitTimer);
+  suppressToastClick = false;
+  likeToast.hidden = false;
+  likeToast.inert = false;
+  void likeToast.offsetHeight;
+  likeToast.classList.add('is-visible');
+  toastTimer = setTimeout(dismissLikeToast,4000);
+}
+likeToast.addEventListener('pointerdown',event=>{
+  if(!event.isPrimary || event.button!==0)return;
+  toastGesture={id:event.pointerId,x:event.clientX,y:event.clientY};
+  suppressToastClick=false;
+});
+window.addEventListener('pointermove',event=>{
+  if(toastGesture?.id!==event.pointerId)return;
+  const dy=event.clientY-toastGesture.y, dx=event.clientX-toastGesture.x;
+  if(dy < -24 && Math.abs(dy)>Math.abs(dx)) {
+    toastGesture=null;
+    suppressToastClick=true;
+    dismissLikeToast();
+  }
+},{passive:true});
+for(const name of ['pointerup','pointercancel'])window.addEventListener(name,()=>{toastGesture=null;});
+$('#like-toast-open').addEventListener('click',()=>{
+  if(suppressToastClick)return;
+  stopHeartbeat();
+  haptic();
+  dismissLikeToast();
+});
+likeToast.addEventListener('keydown',event=>{if(event.key==='Escape')dismissLikeToast();});
+window.addEventListener('pagehide',stopHeartbeat);
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){stopHeartbeat();dismissLikeToast();}
+});
+$('#save').addEventListener('click',()=>{
+  const track=currentTrack();if(!track)return;
+  stopHeartbeat();
+  if(favorites.has(track.src)) {
+    favorites.delete(track.src);
+    haptic();
+    dismissLikeToast();
+  } else {
+    favorites.add(track.src);
+    heartbeat();
+    showLikeToast();
+  }
+  try{localStorage.setItem('zvuk-favorites',JSON.stringify([...favorites]));}catch{}
+  savedState();
+});
 function renderPlaylist() {
   const container=$('#tracks'); container.replaceChildren();
   queues[active]?.forEach((track,i)=>{const button=document.createElement('button');button.className='track';button.setAttribute('aria-current',String(i===positions[active]));button.append(document.createTextNode(track.title));const artist=document.createElement('span');artist.textContent=track.artist;button.append(artist);button.onclick=()=>{haptic();positions[active]=i;loadTrack(true);$('#playlist').close();};container.append(button);});
