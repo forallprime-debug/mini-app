@@ -1,13 +1,13 @@
 {
   "version": 1,
   "order": [
+    2,
     0,
-    1,
-    2
+    1
   ],
   "cards": [
     {
-      "color": "#625BFF",
+      "color": "#4c42ff",
       "idle": {
         "speed": 1.2,
         "intensity": 0.4,
@@ -49,19 +49,19 @@
       "strength": 0.8
     },
     {
-      "color": "#247DA4",
+      "color": "#0d968d",
       "idle": {
         "speed": 1.2,
-        "intensity": 0.4,
-        "contrast": 1,
-        "colorSpread": 1.14,
-        "motionScale": 2.15,
+        "intensity": 0.84,
+        "contrast": 1.7,
+        "colorSpread": 1.21,
+        "motionScale": 2.62,
         "maxPixelRatio": 1.5
       },
       "playing": {
         "speed": 2.8,
-        "intensity": 0.4,
-        "contrast": 1,
+        "intensity": 0.7,
+        "contrast": 1.4,
         "colorSpread": 1.14,
         "motionScale": 2.15,
         "maxPixelRatio": 1.5
