@@ -1,3 +1,8 @@
+// Request media playback semantics where the browser exposes Audio Session.
+try { if(navigator.audioSession)navigator.audioSession.type='playback'; } catch {}
+import {loadConfig,validateConfig} from './card-config.js';
+let cardConfig=await loadConfig();
+document.documentElement.dataset.cardConfig=JSON.stringify(cardConfig);
 // Keep the Mini App at its designed scale, including Safari gesture events.
 for (const name of ['gesturestart', 'gesturechange', 'gestureend']) {
   document.addEventListener(name, event => event.preventDefault(), {passive:false});
@@ -8,11 +13,8 @@ for (const name of ['touchstart', 'touchmove']) {
   }, {passive:false});
 }
 // Card theme is configured here; all player and Telegram colors derive from color.
-const cards = [
-  { color: '#5C5BE4', title: ['Эмбиент-техно', 'романтика'], name: ['Влад', 'Микеев'], role: ['Музыкальный', 'редактор Звук'] },
-  { color: '#BF4245', title: ['Индастриал', 'техно-терапия'], name: ['Тося', 'Чайкина'], role: ['Музыкальный', 'критик'] },
-  { color: '#247DA4', title: ['Сити-поп', 'прямо из Токио'], name: ['Наоки', 'Тачикава'], role: ['Музыкальный', 'журналист'] },
-];
+let cards=cardConfig.cards;
+const count=()=>cards.length;
 const $ = selector => document.querySelector(selector);
 const carousel = $('.carousel'), audio = $('#audio'), seek = $('#seek');
 const tg = window.Telegram?.WebApp;
@@ -27,13 +29,17 @@ function haptic(kind = 'medium') {
   } catch { /* Haptics may be unavailable on this device. */ }
 }
 
-let active = 0, tracks = [], queues = [], positions = [0,0,0], generation = 0, noticeTimer, scrollTimer, initializing = true;
+let active = cardConfig.order[0], tracks = [], queues = [], positions = cards.map(()=>0), generation = 0, noticeTimer, scrollTimer, initializing = true;
 let favorites = new Set();
 try { favorites = new Set(JSON.parse(localStorage.getItem('zvuk-favorites') || '[]')); } catch {}
-const lines = words => words.join('<br>');
+const escapeHtml=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const lines = words => words.map(escapeHtml).join('<br>');
 // Three repeated sets retain the previous implementation's seamless native swipe loop.
-carousel.innerHTML = Array.from({length:3}, (_,set) => cards.map((card,i) => `<article class="card" style="--card-color:${card.color}" data-index="${i}" aria-label="${card.title.join(' ')}" aria-roledescription="слайд" ${set !== 1 ? 'aria-hidden="true"' : ''}><img class="card-background" src="assets/card-0${i+1}-background.png" alt="" draggable="false"><div class="card-top"><img class="logo" src="assets/logo.svg" alt="Звук" draggable="false"><span>[0${i+1}/03]</span></div><img class="avatar" src="assets/card-0${i+1}-avatar.png" alt="${card.name.join(' ')}" draggable="false"><div class="card-copy"><h2>${lines(card.title)}</h2><div class="byline"><p>${lines(card.name)}</p><p>${lines(card.role)}</p></div></div></article>`).join('')).join('');
-const slides = [...carousel.children];
+function buildCards(){
+carousel.innerHTML = Array.from({length:3}, (_,set) => cardConfig.order.map((i,slot) => {const card=cards[i];return `<article class="card" style="--card-color:${card.color}" data-index="${i}" aria-label="${escapeHtml(card.title.join(' '))}" aria-roledescription="слайд" ${set !== 1 ? 'aria-hidden="true"' : ''}><img class="card-background" src="assets/card-0${Math.min(i+1,3)}-background.png" alt="" draggable="false"><div class="card-top"><img class="logo" src="assets/logo.svg" alt="Звук" draggable="false"><span>[${String(slot+1).padStart(2,'0')}/${String(count()).padStart(2,'0')}]</span></div><img class="avatar" src="${escapeHtml(card.avatar)}" alt="${escapeHtml(card.name.join(' '))}" draggable="false"><div class="card-copy"><h2>${lines(card.title)}</h2><div class="byline"><p>${lines(card.name)}</p><p>${lines(card.role)}</p></div></div></article>`;}).join('')).join('');
+}
+buildCards();
+let slides = [...carousel.children];
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function center(index, behavior = 'instant') {
   const el = slides[index];
@@ -47,7 +53,7 @@ function tint(hex, fraction) {
   return '#'+hex.slice(1).match(/../g).map(v=>Math.round(255+(parseInt(v,16)-255)*fraction).toString(16).padStart(2,'0')).join('');
 }
 function theme() {
-  const color = cards[active].color, surface = tint(color,.08);
+  const color = cardConfig.cards[active].color, surface = tint(color,.08);
   document.documentElement.style.setProperty('--accent',color);
   document.documentElement.style.setProperty('--toast-background',color+'cc');
   document.documentElement.style.setProperty('--tint',color+'1a');
@@ -108,7 +114,7 @@ function loadTrack(autoplay=false) {
   $('#song-title').textContent=playerTitle; $('#song-title').title=playerTitle;
   $('#artist').textContent=track.artist; $('#artist').title=track.artist;
   savedState(); progress(); playbackState();
-  if ('mediaSession' in navigator && 'MediaMetadata' in window) navigator.mediaSession.metadata=new MediaMetadata({title:track.title,artist:track.artist,album:cards[active].title.join(' '),artwork:[{src:new URL(`assets/card-0${active+1}-avatar.png`,location.href).href,type:'image/png'}]});
+  if ('mediaSession' in navigator && 'MediaMetadata' in window) navigator.mediaSession.metadata=new MediaMetadata({title:track.title,artist:track.artist,album:cards[active].title.join(' '),artwork:[{src:new URL(cards[active].avatar,location.href).href,type:'image/png'}]});
   if($('#playlist').open) renderPlaylist();
   if(autoplay) void play();
 }
@@ -116,15 +122,16 @@ function selectCard(index) {
   if (index===active) return;
   const resume = !audio.paused;
   active=index; theme(); loadTrack(resume);
+  if(new URLSearchParams(location.search).has('adminPreview'))parent.postMessage({type:'admin:active',index:active},location.origin);
 }
 carousel.addEventListener('scroll',()=>{
   if(initializing) return;
-  selectCard(nearest()%3);
+  selectCard(cardConfig.order[nearest()%count()]);
   clearTimeout(scrollTimer);
-  scrollTimer=setTimeout(()=>{const physical=nearest(); if(physical<3||physical>5) center(3+physical%3);},160);
+  scrollTimer=setTimeout(()=>{const physical=nearest(); if(physical<count()||physical>=count()*2) center(count()+physical%count());},160);
 },{passive:true});
 carousel.addEventListener('keydown',e=>{
-  if(e.key==='ArrowRight'||e.key==='ArrowLeft') { e.preventDefault(); center(Math.max(0,Math.min(8,nearest()+(e.key==='ArrowRight'?1:-1))),reducedMotion?'instant':'smooth'); }
+  if(e.key==='ArrowRight'||e.key==='ArrowLeft') { e.preventDefault(); center(Math.max(0,Math.min(slides.length-1,nearest()+(e.key==='ArrowRight'?1:-1))),reducedMotion?'instant':'smooth'); }
 });
 // Native touch scrolling; pointer drag additionally supports a desktop mouse.
 let drag;
@@ -152,9 +159,9 @@ carousel.addEventListener('pointerup',event=>{
   const direction=event.clientX<avatar.left?-1:event.clientX>avatar.right?1:0;
   if(!direction)return;
   // Recenter the repeated set first to keep wraparound available at both ends.
-  center(3+index%3);
+  center(count()+index%count());
   haptic();
-  center(3+index%3+direction,reducedMotion?'instant':'smooth');
+  center(count()+index%count()+direction,reducedMotion?'instant':'smooth');
 });
 
 function step(delta,autoplay=!audio.paused) { const count=queues[active]?.length || 0;if(!count)return; positions[active]=(positions[active]+delta+count)%count; loadTrack(autoplay); }
@@ -358,15 +365,47 @@ function updateViewport() {
     document.documentElement.style.setProperty('--safe-top',`${(tg.safeAreaInset?.top||0)+(tg.contentSafeAreaInset?.top||0)}px`);
     document.documentElement.style.setProperty('--safe-bottom',`${Math.max(12,(tg.safeAreaInset?.bottom||0)+(tg.contentSafeAreaInset?.bottom||0))}px`);
   }
-  center(3+active);
+  center(count()+cardConfig.order.indexOf(active));
 }
 if(inTelegram){tg.ready();tg.expand();for(const event of ['viewportChanged','safeAreaChanged','contentSafeAreaChanged'])tg.onEvent(event,updateViewport);}
 window.addEventListener('resize',updateViewport);
 if('mediaSession' in navigator){for(const [action,handler] of Object.entries({play:()=>play(),pause:()=>audio.pause(),previoustrack:()=>step(-1),nexttrack:()=>step(1),seekto:details=>{if(Number.isFinite(details.seekTime))audio.currentTime=details.seekTime;}})){try{navigator.mediaSession.setActionHandler(action,handler);}catch{}}}
-updateViewport();theme();requestAnimationFrame(()=>{center(3);initializing=false;});
+updateViewport();theme();requestAnimationFrame(()=>{center(count());initializing=false;});
 try {
   const response=await fetch('tracks.json?v=20260922-sheet'); if(!response.ok)throw new Error('Catalog unavailable');
   tracks=await response.json(); if(!tracks.length)throw new Error('Empty catalog');
-  queues=cards.map((_,i)=>tracks.filter(track=>track.card===i+1));
+  queues=cards.map(card=>tracks.filter(track=>track.card===card.collection));
   loadTrack();
 } catch { $('#song-title').textContent='Нет доступных треков';$('#artist').textContent='Не удалось загрузить Songs';notify('Не удалось загрузить музыку. Обновите страницу.'); }
+
+function applyCardConfig(next){
+  const validated=validateConfig(next);
+  const changed=JSON.stringify(validated.order)!==JSON.stringify(cardConfig.order)||JSON.stringify(validated.cards.map(c=>[c.title,c.name,c.role,c.avatar,c.collection]))!==JSON.stringify(cards.map(c=>[c.title,c.name,c.role,c.avatar,c.collection]));
+  const oldCollection=cards[active]?.collection;
+  cardConfig=validated;cards=cardConfig.cards;
+  if(active>=count())active=cardConfig.order[0];
+  positions=cards.map((_,i)=>positions[i]||0);
+  queues=cards.map(card=>tracks.filter(track=>track.card===card.collection));
+  positions=positions.map((value,i)=>Math.min(value,Math.max(0,queues[i].length-1)));
+  document.documentElement.dataset.cardConfig=JSON.stringify(cardConfig);
+  if(changed){
+    initializing=true;clearTimeout(scrollTimer);buildCards();slides=[...carousel.children];center(count()+cardConfig.order.indexOf(active));
+    if(oldCollection!==cards[active].collection)loadTrack(false);
+    requestAnimationFrame(()=>{initializing=false;});
+  }
+  theme();window.dispatchEvent(new Event('miniapp:config'));
+}
+// The editor only controls its own same-origin preview iframe.
+if(new URLSearchParams(location.search).has('adminPreview')){
+  window.addEventListener('message',event=>{
+    if(event.origin!==location.origin||event.source!==parent)return;
+    try{
+      if(event.data.type==='admin:config')applyCardConfig(event.data.config);
+      if(event.data.type==='admin:card'&&Number.isInteger(event.data.index)&&event.data.index>=0&&event.data.index<count()){
+        audio.pause();selectCard(event.data.index);center(count()+cardConfig.order.indexOf(active));
+      }
+    }catch(error){parent.postMessage({type:'admin:error',message:error.message},location.origin);}
+  });
+  parent.postMessage({type:'admin:ready'},location.origin);
+}
+window.dispatchEvent(new Event('miniapp:config'));
