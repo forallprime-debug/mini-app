@@ -1,4 +1,4 @@
-import {loadConfig,validateConfig} from './card-config.js';
+import {loadConfig,validateConfig} from './card-config.js?v=20260924-four-cards';
 let cardConfig=await loadConfig();
 document.documentElement.dataset.cardConfig=JSON.stringify(cardConfig);
 // Keep the Mini App at its designed scale, including Safari gesture events.
