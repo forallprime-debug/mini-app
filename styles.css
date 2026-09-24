@@ -74,5 +74,3 @@ button{touch-action:manipulation}
 /* Dialog autofocus must not outline the full-width drag handle. */
 #playlist .sheet-handle:focus{outline:none;box-shadow:none}
 #playlist .sheet-handle span{outline:none;box-shadow:none}
-
-.avatar-initials{display:grid;place-items:center;border-radius:50%;background:#ffffff20;color:white;font-size:64px;font-weight:500;flex-shrink:0}

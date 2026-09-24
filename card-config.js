@@ -1,10 +1,9 @@
 export const configKey='zvuk-card-settings-v1';
-export const defaultConfig={version:1,order:[0,1,2,3],cards:['#625BFF','#BF4245','#247DA4','#5A1DA5'].map(color=>({color,idle:{speed:1.2,intensity:.4,contrast:1,colorSpread:1.14,motionScale:2.15,maxPixelRatio:1.5},playing:{speed:2.8,intensity:.4,contrast:1,colorSpread:1.14,motionScale:2.15,maxPixelRatio:1.5},reaction:'both',strength:.8}))};
+export const defaultConfig={version:1,order:[0,1,2],cards:['#625BFF','#BF4245','#247DA4'].map(color=>({color,idle:{speed:1.2,intensity:.4,contrast:1,colorSpread:1.14,motionScale:2.15,maxPixelRatio:1.5},playing:{speed:2.8,intensity:.4,contrast:1,colorSpread:1.14,motionScale:2.15,maxPixelRatio:1.5},reaction:'both',strength:.8}))};
 export function validateConfig(input){
-  if(input?.cards?.length===3 && input.order?.length===3)input={...input,cards:[...input.cards,structuredClone(defaultConfig.cards[3])],order:[...input.order,3]};
   const result=structuredClone(defaultConfig);
-  if(!input||!Array.isArray(input.cards)||input.cards.length!==4)throw Error('Нужны настройки четырёх карточек');
-  if(!Array.isArray(input.order)||input.order.length!==4||new Set(input.order).size!==4||input.order.some(i=>![0,1,2,3].includes(i)))throw Error('Неверный порядок карточек');
+  if(!input||!Array.isArray(input.cards)||input.cards.length!==3)throw Error('Нужны настройки трёх карточек');
+  if(!Array.isArray(input.order)||input.order.length!==3||new Set(input.order).size!==3||input.order.some(i=>![0,1,2].includes(i)))throw Error('Неверный порядок карточек');
   result.order=[...input.order];
   const ranges={speed:[0,4],intensity:[0,2],contrast:[0,2],colorSpread:[0,1.5],motionScale:[0,3],maxPixelRatio:[.5,2]};
   input.cards.forEach((card,i)=>{

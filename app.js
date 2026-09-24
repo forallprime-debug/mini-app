@@ -1,4 +1,4 @@
-import {loadConfig,validateConfig} from './card-config.js?v=20260924-four-cards';
+import {loadConfig,validateConfig} from './card-config.js';
 let cardConfig=await loadConfig();
 document.documentElement.dataset.cardConfig=JSON.stringify(cardConfig);
 // Keep the Mini App at its designed scale, including Safari gesture events.
@@ -12,13 +12,10 @@ for (const name of ['touchstart', 'touchmove']) {
 }
 // Card theme is configured here; all player and Telegram colors derive from color.
 const cards = [
-  
   { color: '#5C5BE4', title: ['Эмбиент-техно', 'романтика'], name: ['Влад', 'Микеев'], role: ['Музыкальный', 'редактор Звук'] },
   { color: '#BF4245', title: ['Индастриал', 'техно-терапия'], name: ['Тося', 'Чайкина'], role: ['Музыкальный', 'критик'] },
   { color: '#247DA4', title: ['Сити-поп', 'прямо из Токио'], name: ['Наоки', 'Тачикава'], role: ['Музыкальный', 'журналист'] },
-  {color:'#5A1DA5',title:['Атмосфераная','дарк альтернатива'],name:['Дима','Красногоров'],role:['Дизайнер продукта','Звук']},
 ];
-const cardCount=cards.length;
 const $ = selector => document.querySelector(selector);
 const carousel = $('.carousel'), audio = $('#audio'), seek = $('#seek');
 const tg = window.Telegram?.WebApp;
@@ -33,12 +30,12 @@ function haptic(kind = 'medium') {
   } catch { /* Haptics may be unavailable on this device. */ }
 }
 
-let active = cardConfig.order[0], tracks = [], queues = [], positions = cards.map(()=>0), generation = 0, noticeTimer, scrollTimer, initializing = true;
+let active = cardConfig.order[0], tracks = [], queues = [], positions = [0,0,0], generation = 0, noticeTimer, scrollTimer, initializing = true;
 let favorites = new Set();
 try { favorites = new Set(JSON.parse(localStorage.getItem('zvuk-favorites') || '[]')); } catch {}
 const lines = words => words.join('<br>');
 // Three repeated sets retain the previous implementation's seamless native swipe loop.
-carousel.innerHTML = Array.from({length:3}, (_,set) => cardConfig.order.map((i,slot) => {const card=cards[i];return `<article class="card" style="--card-color:${card.color}" data-index="${i}" aria-label="${card.title.join(' ')}" aria-roledescription="слайд" ${set !== 1 ? 'aria-hidden="true"' : ''}>${i<3?`<img class="card-background" src="assets/card-0${i+1}-background.png" alt="" draggable="false">`:""}<div class="card-top"><img class="logo" src="assets/logo.svg" alt="Звук" draggable="false"><span>[0${slot+1}/${String(cardCount).padStart(2,'0')}]</span></div><img class="avatar" src="assets/card-0${i+1}-avatar.png" alt="${card.name.join(' ')}" draggable="false"><div class="card-copy"><h2>${lines(card.title)}</h2><div class="byline"><p>${lines(card.name)}</p><p>${lines(card.role)}</p></div></div></article>`;}).join('')).join('');
+carousel.innerHTML = Array.from({length:3}, (_,set) => cardConfig.order.map((i,slot) => {const card=cards[i];return `<article class="card" style="--card-color:${card.color}" data-index="${i}" aria-label="${card.title.join(' ')}" aria-roledescription="слайд" ${set !== 1 ? 'aria-hidden="true"' : ''}><img class="card-background" src="assets/card-0${i+1}-background.png" alt="" draggable="false"><div class="card-top"><img class="logo" src="assets/logo.svg" alt="Звук" draggable="false"><span>[0${slot+1}/03]</span></div><img class="avatar" src="assets/card-0${i+1}-avatar.png" alt="${card.name.join(' ')}" draggable="false"><div class="card-copy"><h2>${lines(card.title)}</h2><div class="byline"><p>${lines(card.name)}</p><p>${lines(card.role)}</p></div></div></article>`;}).join('')).join('');
 let slides = [...carousel.children];
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function center(index, behavior = 'instant') {
@@ -126,12 +123,12 @@ function selectCard(index) {
 }
 carousel.addEventListener('scroll',()=>{
   if(initializing) return;
-  selectCard(cardConfig.order[nearest()%cardCount]);
+  selectCard(cardConfig.order[nearest()%3]);
   clearTimeout(scrollTimer);
-  scrollTimer=setTimeout(()=>{const physical=nearest(); if(physical<cardCount||physical>=cardCount*2) center(cardCount+physical%cardCount);},160);
+  scrollTimer=setTimeout(()=>{const physical=nearest(); if(physical<3||physical>5) center(3+physical%3);},160);
 },{passive:true});
 carousel.addEventListener('keydown',e=>{
-  if(e.key==='ArrowRight'||e.key==='ArrowLeft') { e.preventDefault(); center(Math.max(0,Math.min(slides.length-1,nearest()+(e.key==='ArrowRight'?1:-1))),reducedMotion?'instant':'smooth'); }
+  if(e.key==='ArrowRight'||e.key==='ArrowLeft') { e.preventDefault(); center(Math.max(0,Math.min(8,nearest()+(e.key==='ArrowRight'?1:-1))),reducedMotion?'instant':'smooth'); }
 });
 // Native touch scrolling; pointer drag additionally supports a desktop mouse.
 let drag;
@@ -159,9 +156,9 @@ carousel.addEventListener('pointerup',event=>{
   const direction=event.clientX<avatar.left?-1:event.clientX>avatar.right?1:0;
   if(!direction)return;
   // Recenter the repeated set first to keep wraparound available at both ends.
-  center(cardCount+index%cardCount);
+  center(3+index%3);
   haptic();
-  center(cardCount+index%cardCount+direction,reducedMotion?'instant':'smooth');
+  center(3+index%3+direction,reducedMotion?'instant':'smooth');
 });
 
 function step(delta,autoplay=!audio.paused) { const count=queues[active]?.length || 0;if(!count)return; positions[active]=(positions[active]+delta+count)%count; loadTrack(autoplay); }
@@ -365,12 +362,12 @@ function updateViewport() {
     document.documentElement.style.setProperty('--safe-top',`${(tg.safeAreaInset?.top||0)+(tg.contentSafeAreaInset?.top||0)}px`);
     document.documentElement.style.setProperty('--safe-bottom',`${Math.max(12,(tg.safeAreaInset?.bottom||0)+(tg.contentSafeAreaInset?.bottom||0))}px`);
   }
-  center(cardCount+cardConfig.order.indexOf(active));
+  center(3+cardConfig.order.indexOf(active));
 }
 if(inTelegram){tg.ready();tg.expand();for(const event of ['viewportChanged','safeAreaChanged','contentSafeAreaChanged'])tg.onEvent(event,updateViewport);}
 window.addEventListener('resize',updateViewport);
 if('mediaSession' in navigator){for(const [action,handler] of Object.entries({play:()=>play(),pause:()=>audio.pause(),previoustrack:()=>step(-1),nexttrack:()=>step(1),seekto:details=>{if(Number.isFinite(details.seekTime))audio.currentTime=details.seekTime;}})){try{navigator.mediaSession.setActionHandler(action,handler);}catch{}}}
-updateViewport();theme();requestAnimationFrame(()=>{center(cardCount);initializing=false;});
+updateViewport();theme();requestAnimationFrame(()=>{center(3);initializing=false;});
 try {
   const response=await fetch('tracks.json?v=20260922-sheet'); if(!response.ok)throw new Error('Catalog unavailable');
   tracks=await response.json(); if(!tracks.length)throw new Error('Empty catalog');
@@ -386,11 +383,11 @@ function applyCardConfig(next){
     initializing=true;
     const old=[...slides];
     for(let set=0;set<3;set++)for(const id of cardConfig.order){
-      const node=old.slice(set*cardCount,set*cardCount+cardCount).find(el=>Number(el.dataset.index)===id);
-      node.querySelector('.card-top span').textContent=`[0${cardConfig.order.indexOf(id)+1}/${String(cardCount).padStart(2,'0')}]`;
+      const node=old.slice(set*3,set*3+3).find(el=>Number(el.dataset.index)===id);
+      node.querySelector('.card-top span').textContent=`[0${cardConfig.order.indexOf(id)+1}/03]`;
       carousel.append(node);
     }
-    slides=[...carousel.children];center(cardCount+cardConfig.order.indexOf(active));
+    slides=[...carousel.children];center(3+cardConfig.order.indexOf(active));
     requestAnimationFrame(()=>{initializing=false;});
   }
   theme();window.dispatchEvent(new Event('miniapp:config'));
@@ -401,8 +398,8 @@ if(new URLSearchParams(location.search).has('adminPreview')){
     if(event.origin!==location.origin||event.source!==parent)return;
     try{
       if(event.data.type==='admin:config')applyCardConfig(event.data.config);
-      if(event.data.type==='admin:card'&&[0,1,2,3].includes(event.data.index)){
-        audio.pause();selectCard(event.data.index);center(cardCount+cardConfig.order.indexOf(active));
+      if(event.data.type==='admin:card'&&[0,1,2].includes(event.data.index)){
+        audio.pause();selectCard(event.data.index);center(3+cardConfig.order.indexOf(active));
       }
     }catch(error){parent.postMessage({type:'admin:error',message:error.message},location.origin);}
   });
