@@ -118,15 +118,16 @@ function loadTrack(autoplay=false) {
   if($('#playlist').open) renderPlaylist();
   if(autoplay) void play();
 }
-function selectCard(index) {
+function selectCard(index, feedback=false) {
   if (index===active) return;
+  if(feedback)haptic('light');
   const resume = !audio.paused;
   active=index; theme(); loadTrack(resume);
   if(new URLSearchParams(location.search).has('adminPreview'))parent.postMessage({type:'admin:active',index:active},location.origin);
 }
 carousel.addEventListener('scroll',()=>{
   if(initializing) return;
-  selectCard(cardConfig.order[nearest()%count()]);
+  selectCard(cardConfig.order[nearest()%count()],true);
   clearTimeout(scrollTimer);
   scrollTimer=setTimeout(()=>{const physical=nearest(); if(physical<count()||physical>=count()*2) center(count()+physical%count());},160);
 },{passive:true});
@@ -160,7 +161,6 @@ carousel.addEventListener('pointerup',event=>{
   if(!direction)return;
   // Recenter the repeated set first to keep wraparound available at both ends.
   center(count()+index%count());
-  haptic();
   center(count()+index%count()+direction,reducedMotion?'instant':'smooth');
 });
 
